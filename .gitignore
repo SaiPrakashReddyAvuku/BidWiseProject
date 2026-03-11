@@ -1,0 +1,41 @@
+# ---------------------------
+# Editor / OS
+# ---------------------------
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ---------------------------
+# Frontend (Next.js)
+# ---------------------------
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/.env.local
+frontend/.env.*.local
+
+# ---------------------------
+# Backend (Spring Boot)
+# ---------------------------
+backend/target/
+backend/bin/
+backend/.env
+backend/.env.local
+
+# ---------------------------
+# Root explanation docs / exports
+# ---------------------------
+/All_Parts_Chat_As_Is.md
+/All_Parts_Chat_As_Is.pdf
+/BidWise-frontend-prototype.zip
+/BidWise_Mentor_Preparation_Final.md
+/BidWise_Mentor_Preparation_Final.pdf
+/Mentor_Preparation_Guide.md
+/Project_Deep_Explanation_BidWise.md
+/Project_Deep_Explanation_BidWise.pdf
+/Project_Deep_Explanation_BidWise_Final.md
+/Project_Deep_Explanation_BidWise_Final.pdf
+/Project_Deep_Explanation_Supplement.md
