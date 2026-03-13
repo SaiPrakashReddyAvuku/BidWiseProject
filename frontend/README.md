@@ -1,8 +1,8 @@
-﻿# BidWise Frontend Prototype
+# BidWise Frontend
 
-BidWise is a complete frontend prototype of a reverse bidding SaaS platform built with Next.js App Router, TypeScript, Tailwind CSS, shadcn-style UI components, and Zustand state management.
+BidWise is a reverse bidding SaaS frontend built with Next.js App Router, TypeScript, Tailwind CSS, shadcn-style UI components, and Zustand state management.
 
-This project uses mock data and a simulated API layer, so the full reverse bidding workflow can be tested without any backend.
+The app is connected to the Spring Boot backend API and reads/writes data from the database through HTTP endpoints.
 
 ## Features
 
@@ -10,13 +10,13 @@ This project uses mock data and a simulated API layer, so the full reverse biddi
 - Buyer flow: dashboard, create project, project details, bid comparison, accept/reject bid, contract view
 - Seller flow: dashboard, browse projects with filters, project details, place bid modal, my bids, seller profile
 - Admin flow: dashboard metrics/charts, user management, moderation, dispute resolution
-- Shared modules: messaging UI (with attachment mock + notification indicator), notifications, settings, reviews/ratings
-- Simulated service layer in `features/services/api.ts`
+- Shared modules: messaging UI, notifications, settings, reviews/ratings
+- API client layer in `features/services/api.ts`
 - Strongly typed domain models in `types/index.ts`
 
 ## Tech Stack
 
-- Next.js 15 (App Router)
+- Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS
 - shadcn-style reusable UI components
@@ -26,41 +26,47 @@ This project uses mock data and a simulated API layer, so the full reverse biddi
 
 - `app/` routes and layouts
 - `components/` reusable UI/layout/domain components
-- `features/` state store and API simulation
+- `features/` state store and API client
 - `hooks/` reusable hooks
-- `mock-data/` seeded buyers, sellers, admin, projects, bids, messages, contracts
 - `types/` TypeScript interfaces and domain types
 - `utils/` shared utility helpers
 
 ## Getting Started
 
-1. Install dependencies
+1. Start backend API first (`http://localhost:8080/api`).
+
+2. Configure frontend API base URL:
+
+```bash
+echo NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api > .env.local
+```
+
+3. Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Start dev server
+4. Start dev server:
 
 ```bash
 npm run dev
 ```
 
-3. Open:
+5. Open:
 
 - [http://localhost:3000](http://localhost:3000)
 
 ## Demo Accounts
 
-Use these emails on `/login` (password is mock-only and not validated):
+Use these seeded accounts on `/login` (password: `password`):
 
 - Buyer: `buyer@bidwise.com`
 - Seller: `seller@bidwise.com`
 - Seller: `seller2@bidwise.com`
-- Seller: `seller3@bidwise.com`
 - Admin: `admin@bidwise.com`
 
-## Reverse Bidding Workflow (Mock)
+## Reverse Bidding Workflow
 
 1. Login as buyer and create a project.
 2. Login as seller and place bids on open projects.
@@ -71,6 +77,6 @@ Use these emails on `/login` (password is mock-only and not validated):
 
 ## Notes
 
-- All data is mock data stored in Zustand; updates are immediate in UI.
-- API-like calls are simulated in `features/services/api.ts` using delays and store actions.
-- No backend, database, or real authentication is required.
+- Core marketplace data is persisted through backend APIs and database.
+- `forgot-password` is currently UI simulation only.
+- Settings currently persist `name`, `phone`, and `companyName`; password/payment fields are UI placeholders.

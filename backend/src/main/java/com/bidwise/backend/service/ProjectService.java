@@ -19,5 +19,8 @@ public interface ProjectService {
     List<BidResponse> getProjectBids(UUID projectId);
     ContractResponse acceptBid(UUID projectId, UUID bidId);
     BidResponse rejectBid(UUID projectId, UUID bidId);
+    ProjectResponse completeProject(UUID projectId);
     PageResponse<BidResponse> getSellerBids(UUID sellerId, int page, int size);
+    PageResponse<ContractResponse> getContractsForUser(UUID userId, int page, int size);
+    ContractResponse getContract(UUID contractId);
 }

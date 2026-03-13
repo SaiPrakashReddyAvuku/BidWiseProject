@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api, setAuthToken } from "@/features/services/api";
-import { mockBids, mockContracts, mockDisputes, mockMessages, mockNotifications, mockProjects, mockReviews, mockUsers } from "@/mock-data";
 import { Bid, Contract, Dispute, Message, Notification, Project, Review, User, UserRole } from "@/types";
 
 type RegisterPayload = {
@@ -59,13 +58,14 @@ type BidWiseState = {
   placeBid: (payload: PlaceBidPayload) => Promise<void>;
   acceptBid: (bidId: string) => Promise<void>;
   rejectBid: (bidId: string) => Promise<void>;
+  completeProject: (projectId: string) => Promise<void>;
   sendMessage: (toUserId: string, content: string, attachment?: string) => Promise<void>;
   refreshConversation: (peerId: string) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   blockUser: (id: string) => Promise<void>;
   verifyVendor: (id: string) => Promise<void>;
   resolveDispute: (id: string) => Promise<void>;
-  updateSettings: (payload: SettingsPayload) => void;
+  updateSettings: (payload: SettingsPayload) => Promise<void>;
   addReview: (toUserId: string, rating: number, comment: string) => Promise<void>;
 };
 
@@ -78,14 +78,14 @@ const uniqueById = <T extends { id: string }>(items: T[]): T[] => {
 export const useBidWiseStore = create<BidWiseState>()(
   persist(
     (set, get) => ({
-      users: mockUsers,
-      projects: mockProjects,
-      bids: mockBids,
-      notifications: mockNotifications,
-      messages: mockMessages,
-      contracts: mockContracts,
-      reviews: mockReviews,
-      disputes: mockDisputes,
+      users: [],
+      projects: [],
+      bids: [],
+      notifications: [],
+      messages: [],
+      contracts: [],
+      reviews: [],
+      disputes: [],
       currentUser: null,
       authToken: null,
       loading: false,
@@ -144,7 +144,7 @@ export const useBidWiseStore = create<BidWiseState>()(
 
           let projects: Project[] = [];
           let bids: Bid[] = [];
-          let disputes: Dispute[] = get().disputes;
+          let disputes: Dispute[] = [];
 
           if (resolvedCurrentUser.role === "buyer") {
             projects = await api.getBuyerProjects(resolvedCurrentUser.id);
@@ -168,6 +168,7 @@ export const useBidWiseStore = create<BidWiseState>()(
 
           const notifications = await api.getNotifications(resolvedCurrentUser.id);
           const reviews = await api.getReviewsForUser(resolvedCurrentUser.id);
+          const contracts = await api.getContractsForUser(resolvedCurrentUser.id);
 
           set((state) => ({
             users: uniqueById([...safeUsers, ...state.users]),
@@ -176,6 +177,7 @@ export const useBidWiseStore = create<BidWiseState>()(
             bids,
             notifications,
             reviews: uniqueById([...reviews, ...state.reviews]),
+            contracts,
             disputes,
             loading: false
           }));
@@ -196,8 +198,7 @@ export const useBidWiseStore = create<BidWiseState>()(
 
         set({ loading: true });
         try {
-          const project = await api.createProject(payload);
-          set((state) => ({ projects: [project, ...state.projects], loading: false }));
+          await api.createProject(payload);
           await get().syncForCurrentUser();
         } catch (error) {
           set({ loading: false });
@@ -208,11 +209,11 @@ export const useBidWiseStore = create<BidWiseState>()(
       placeBid: async (payload) => {
         set({ loading: true });
         try {
-          const bid = await api.placeBid(payload);
-          set((state) => ({ bids: uniqueById([bid, ...state.bids]), loading: false }));
+          await api.placeBid(payload);
           await get().syncForCurrentUser();
-        } catch {
+        } catch (error) {
           set({ loading: false });
+          throw error;
         }
       },
 
@@ -222,22 +223,11 @@ export const useBidWiseStore = create<BidWiseState>()(
 
         set({ loading: true });
         try {
-          const contract = await api.acceptBid(bid.projectId, bidId);
-          set((state) => ({
-            bids: state.bids.map((item) =>
-              item.projectId === bid.projectId
-                ? { ...item, status: item.id === bidId ? "accepted" : "rejected" }
-                : item
-            ),
-            projects: state.projects.map((item) =>
-              item.id === bid.projectId ? { ...item, status: "in_progress" } : item
-            ),
-            contracts: uniqueById([contract, ...state.contracts]),
-            loading: false
-          }));
+          await api.acceptBid(bid.projectId, bidId);
           await get().syncForCurrentUser();
-        } catch {
+        } catch (error) {
           set({ loading: false });
+          throw error;
         }
       },
 
@@ -246,14 +236,21 @@ export const useBidWiseStore = create<BidWiseState>()(
         if (!bid) return;
 
         try {
-          const updated = await api.rejectBid(bid.projectId, bidId);
-          set((state) => ({
-            bids: state.bids.map((item) => (item.id === bidId ? updated : item))
-          }));
-        } catch {
-          set((state) => ({
-            bids: state.bids.map((item) => (item.id === bidId ? { ...item, status: "rejected" } : item))
-          }));
+          await api.rejectBid(bid.projectId, bidId);
+          await get().syncForCurrentUser();
+        } catch (error) {
+          throw error;
+        }
+      },
+
+      completeProject: async (projectId) => {
+        set({ loading: true });
+        try {
+          await api.completeProject(projectId);
+          await get().syncForCurrentUser();
+        } catch (error) {
+          set({ loading: false });
+          throw error;
         }
       },
 
@@ -262,24 +259,15 @@ export const useBidWiseStore = create<BidWiseState>()(
         if (!currentUser) return;
 
         try {
-          const message = await api.sendMessage({
+          await api.sendMessage({
             fromUserId: currentUser.id,
             toUserId,
             content,
             attachment
           });
-          set((state) => ({ messages: uniqueById([...state.messages, message]) }));
           await get().syncForCurrentUser();
-        } catch {
-          const fallback: Message = {
-            id: `local-msg-${Date.now()}`,
-            fromUserId: currentUser.id,
-            toUserId,
-            content,
-            attachment,
-            createdAt: new Date().toISOString()
-          };
-          set((state) => ({ messages: [...state.messages, fallback] }));
+        } catch (error) {
+          throw error;
         }
       },
 
@@ -289,8 +277,8 @@ export const useBidWiseStore = create<BidWiseState>()(
         try {
           const conversation = await api.getConversation(currentUser.id, peerId);
           set((state) => ({ messages: uniqueById([...state.messages, ...conversation]) }));
-        } catch {
-          // no-op fallback
+        } catch (error) {
+          throw error;
         }
       },
 
@@ -300,12 +288,8 @@ export const useBidWiseStore = create<BidWiseState>()(
           set((state) => ({
             notifications: state.notifications.map((item) => (item.id === id ? updated : item))
           }));
-        } catch {
-          set((state) => ({
-            notifications: state.notifications.map((item) =>
-              item.id === id ? { ...item, isRead: true } : item
-            )
-          }));
+        } catch (error) {
+          throw error;
         }
       },
 
@@ -315,10 +299,8 @@ export const useBidWiseStore = create<BidWiseState>()(
           set((state) => ({
             users: state.users.map((item) => (item.id === id ? updated : item))
           }));
-        } catch {
-          set((state) => ({
-            users: state.users.map((item) => (item.id === id ? { ...item, blocked: true } : item))
-          }));
+        } catch (error) {
+          throw error;
         }
       },
 
@@ -328,10 +310,8 @@ export const useBidWiseStore = create<BidWiseState>()(
           set((state) => ({
             users: state.users.map((item) => (item.id === id ? updated : item))
           }));
-        } catch {
-          set((state) => ({
-            users: state.users.map((item) => (item.id === id ? { ...item, verified: true } : item))
-          }));
+        } catch (error) {
+          throw error;
         }
       },
 
@@ -341,19 +321,16 @@ export const useBidWiseStore = create<BidWiseState>()(
           set((state) => ({
             disputes: state.disputes.map((item) => (item.id === id ? updated : item))
           }));
-        } catch {
-          set((state) => ({
-            disputes: state.disputes.map((item) =>
-              item.id === id ? { ...item, status: "resolved" } : item
-            )
-          }));
+        } catch (error) {
+          throw error;
         }
       },
 
-      updateSettings: (payload) => {
+      updateSettings: async (payload) => {
         const currentUser = get().currentUser;
         if (!currentUser) return;
-        const updated = { ...currentUser, ...payload };
+
+        const updated = await api.updateUser(currentUser.id, payload);
         set((state) => ({
           currentUser: updated,
           users: state.users.map((item) => (item.id === currentUser.id ? updated : item))
@@ -364,23 +341,15 @@ export const useBidWiseStore = create<BidWiseState>()(
         const currentUser = get().currentUser;
         if (!currentUser) return;
         try {
-          const review = await api.addReview({
+          await api.addReview({
             fromUserId: currentUser.id,
             toUserId,
             rating,
             comment
           });
-          set((state) => ({ reviews: [review, ...state.reviews] }));
-        } catch {
-          const fallback: Review = {
-            id: `local-review-${Date.now()}`,
-            fromUserId: currentUser.id,
-            toUserId,
-            rating,
-            comment,
-            createdAt: new Date().toISOString().slice(0, 10)
-          };
-          set((state) => ({ reviews: [fallback, ...state.reviews] }));
+          await get().syncForCurrentUser();
+        } catch (error) {
+          throw error;
         }
       }
     }),
@@ -397,9 +366,6 @@ export const useBidWiseStore = create<BidWiseState>()(
     }
   )
 );
-
-
-
 
 
 

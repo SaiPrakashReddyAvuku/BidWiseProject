@@ -3,6 +3,7 @@ package com.bidwise.backend.service.impl;
 import com.bidwise.backend.dto.common.PageResponse;
 import com.bidwise.backend.dto.user.UserCreateRequest;
 import com.bidwise.backend.dto.user.UserResponse;
+import com.bidwise.backend.dto.user.UserUpdateRequest;
 import com.bidwise.backend.entity.UserEntity;
 import com.bidwise.backend.entity.enums.UserRole;
 import com.bidwise.backend.exception.ConflictException;
@@ -63,6 +64,25 @@ public class UserServiceImpl implements UserService {
     public UserResponse getById(UUID userId) {
         return DtoMapper.toUserResponse(userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId)));
+    }
+
+    @Override
+    @Transactional
+    public UserResponse update(UUID userId, UserUpdateRequest request) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+
+        if (request.name() != null) {
+            user.setName(request.name());
+        }
+        if (request.phone() != null) {
+            user.setPhone(request.phone());
+        }
+        if (request.companyName() != null) {
+            user.setCompanyName(request.companyName());
+        }
+
+        return DtoMapper.toUserResponse(user);
     }
 
     @Override

@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -16,8 +16,36 @@
   --ring: 204 86% 42%;
 }
 
+html[data-theme="light"] {
+  --background: 212 38% 96%;
+  --foreground: 222 34% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 34% 14%;
+  --primary: 204 86% 42%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 214 24% 90%;
+  --muted-foreground: 217 22% 30%;
+  --border: 214 28% 80%;
+  --input: 214 28% 80%;
+  --ring: 204 86% 42%;
+}
+
+html[data-theme="dark"] {
+  --background: 223 31% 10%;
+  --foreground: 210 25% 92%;
+  --card: 223 23% 16%;
+  --card-foreground: 210 25% 92%;
+  --primary: 198 93% 60%;
+  --primary-foreground: 222 37% 11%;
+  --muted: 223 18% 19%;
+  --muted-foreground: 215 16% 78%;
+  --border: 222 17% 30%;
+  --input: 222 17% 30%;
+  --ring: 198 93% 60%;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-theme]) {
     --background: 223 31% 10%;
     --foreground: 210 25% 92%;
     --card: 223 23% 16%;
@@ -45,8 +73,15 @@ body {
   background-attachment: fixed;
 }
 
+html[data-theme="dark"] body {
+  background-image:
+    radial-gradient(circle at 15% 18%, rgba(14, 165, 233, 0.18), transparent 35%),
+    radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.15), transparent 30%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0));
+}
+
 @media (prefers-color-scheme: dark) {
-  body {
+  html:not([data-theme]) body {
     background-image:
       radial-gradient(circle at 15% 18%, rgba(14, 165, 233, 0.18), transparent 35%),
       radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.15), transparent 30%),
@@ -58,8 +93,12 @@ body {
   @apply text-foreground border border-slate-300/80 bg-white/80 shadow-xl shadow-slate-900/10 backdrop-blur-lg;
 }
 
+html[data-theme="dark"] .glass-panel {
+  @apply border-slate-500/35 bg-slate-900/70 shadow-black/35;
+}
+
 @media (prefers-color-scheme: dark) {
-  .glass-panel {
+  html:not([data-theme]) .glass-panel {
     @apply border-slate-500/35 bg-slate-900/70 shadow-black/35;
   }
 }
@@ -72,9 +111,12 @@ body {
   @apply rounded-2xl border border-slate-300/80 bg-white/90 p-3 text-xs text-foreground shadow-xl shadow-slate-900/20 backdrop-blur-lg;
 }
 
+html[data-theme="dark"] .preview-surface {
+  @apply border-slate-500/35 bg-slate-900/90 shadow-black/40;
+}
+
 @media (prefers-color-scheme: dark) {
-  .preview-surface {
+  html:not([data-theme]) .preview-surface {
     @apply border-slate-500/35 bg-slate-900/90 shadow-black/40;
   }
 }
-

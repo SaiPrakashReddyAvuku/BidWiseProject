@@ -1,4 +1,4 @@
-﻿import { HoverPreview } from "@/components/common/hover-preview";
+import { HoverPreview } from "@/components/common/hover-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -85,7 +85,7 @@ export function BidTable({
               <TableCell>{formatDate(bid.createdAt)}</TableCell>
               {canManage ? (
                 <TableCell className="space-x-2">
-                  <Button size="sm" onClick={() => onAccept?.(bid.id)} disabled={bid.status === "accepted"}>Accept</Button>
+                  <Button size="sm" onClick={() => onAccept?.(bid.id)} disabled={bid.status !== "pending"}>Accept</Button>
                   <Button size="sm" variant="outline" onClick={() => onReject?.(bid.id)} disabled={bid.status !== "pending"}>Reject</Button>
                 </TableCell>
               ) : null}

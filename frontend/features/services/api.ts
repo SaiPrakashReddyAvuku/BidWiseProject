@@ -363,6 +363,11 @@ export const api = {
     return mapBid(bid);
   },
 
+  completeProject: async (projectId: string): Promise<Project> => {
+    const project = await request<ApiProject>(`/buyer/projects/${projectId}/complete`, { method: "PATCH" });
+    return mapProject(project);
+  },
+
   getNotifications: async (userId: string): Promise<Notification[]> => {
     const page = await request<ApiPage<ApiNotification>>("/notifications", undefined, { userId, page: 0, size: 300 });
     return page.content.map(mapNotification);
@@ -404,6 +409,15 @@ export const api = {
     return page.content.map(mapReview);
   },
 
+  getContractsForUser: async (userId: string): Promise<Contract[]> => {
+    const page = await request<ApiPage<ApiContract>>("/contracts", undefined, { userId, page: 0, size: 200 });
+    return page.content.map(mapContract);
+  },
+
+  getContract: async (id: string): Promise<Contract> => {
+    const contract = await request<ApiContract>(`/contracts/${id}`);
+    return mapContract(contract);
+  },
   createDispute: async (payload: { projectId: string; raisedBy: string; against: string; reason: string }): Promise<Dispute> => {
     const dispute = await request<ApiDispute>("/disputes", {
       method: "POST",
@@ -422,6 +436,13 @@ export const api = {
     return mapDispute(dispute);
   },
 
+  updateUser: async (id: string, payload: { name?: string; phone?: string; companyName?: string }): Promise<User> => {
+    const user = await request<ApiUser>(`/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+    return mapUser(user);
+  },
   blockUser: async (id: string): Promise<User> => {
     const user = await request<ApiUser>(`/admin/users/${id}/block`, { method: "PATCH" });
     return mapUser(user);
@@ -432,6 +453,9 @@ export const api = {
     return mapUser(user);
   }
 };
+
+
+
 
 
 

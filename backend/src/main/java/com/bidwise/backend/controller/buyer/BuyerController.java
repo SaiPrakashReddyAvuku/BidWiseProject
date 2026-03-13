@@ -55,4 +55,9 @@ public class BuyerController {
     public BidResponse rejectBid(@PathVariable UUID projectId, @PathVariable UUID bidId) {
         return projectService.rejectBid(projectId, bidId);
     }
+
+    @PatchMapping("/projects/{projectId}/complete")
+    public ProjectResponse completeProject(@PathVariable UUID projectId) {
+        return projectService.completeProject(projectId);
+    }
 }

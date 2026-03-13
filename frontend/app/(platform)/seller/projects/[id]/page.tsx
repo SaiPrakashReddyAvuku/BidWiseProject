@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { RoleGuard } from "@/components/auth/role-guard";
+import { AttachmentList } from "@/components/projects/attachment-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,7 +59,10 @@ export default function SellerProjectDetailsPage() {
           <CardContent className="space-y-2 text-sm">
             <p>{project.description}</p>
             <p>Budget: {formatCurrency(project.budget)}</p>
-            <p>Attachments: {project.attachments.join(", ")}</p>
+            <div>
+              <p className="mb-1">Attachments</p>
+              <AttachmentList attachments={project.attachments} />
+            </div>
             <p>Buyer: {buyer?.name} ({buyer?.companyName ?? "No company"})</p>
             <Button onClick={() => setOpen(true)}>Place Bid</Button>
           </CardContent>
@@ -86,3 +90,4 @@ export default function SellerProjectDetailsPage() {
     </RoleGuard>
   );
 }
+

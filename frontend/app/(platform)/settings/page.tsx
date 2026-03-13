@@ -16,9 +16,9 @@ export default function SettingsPage() {
   const [password, setPassword] = useState("");
   const [paymentDetails, setPaymentDetails] = useState("Stripe Account: demo-account");
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    updateSettings({ name, phone, companyName });
+    await updateSettings({ name, phone, companyName });
     void password;
     void paymentDetails;
   };
@@ -39,5 +39,6 @@ export default function SettingsPage() {
     </Card>
   );
 }
+
 
 

@@ -1,41 +1,76 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, BriefcaseBusiness, Gauge, Gavel, MessageCircle, Settings, ShieldCheck, Star, Users } from "lucide-react";
+import {
+  Bell,
+  BriefcaseBusiness,
+  ChartNoAxesColumn,
+  Gauge,
+  Gavel,
+  MessageCircle,
+  Settings,
+  ShieldCheck,
+  Star,
+  Users
+} from "lucide-react";
 import { cn } from "@/utils";
 import { UserRole } from "@/types";
 
-const commonLinks = [
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/messages", label: "Messages", icon: MessageCircle },
-  { href: "/reviews", label: "Reviews", icon: Star },
-  { href: "/settings", label: "Settings", icon: Settings }
-];
+type NavLink = {
+  href: string;
+  label: string;
+  icon: typeof Gauge;
+};
 
-const roleLinks: Record<UserRole, { href: string; label: string; icon: typeof Gauge }[]> = {
+const roleLinks: Record<UserRole, NavLink[]> = {
   buyer: [
-    { href: "/buyer/dashboard", label: "Buyer Dashboard", icon: Gauge },
+    { href: "/buyer/dashboard", label: "Dashboard", icon: Gauge },
+    { href: "/buyer/projects", label: "My Projects", icon: BriefcaseBusiness },
     { href: "/buyer/projects/create", label: "Create Project", icon: BriefcaseBusiness },
-    { href: "/buyer/bids/compare", label: "Bid Comparison", icon: Gavel }
+    { href: "/buyer/bids/compare", label: "Bid Comparison", icon: Gavel },
+    { href: "/buyer/analytics", label: "Analytics", icon: ChartNoAxesColumn },
+    { href: "/reviews", label: "Reviews", icon: Star },
+    { href: "/messages", label: "Messages", icon: MessageCircle },
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    { href: "/settings", label: "Settings", icon: Settings }
   ],
   seller: [
     { href: "/seller/dashboard", label: "Seller Dashboard", icon: Gauge },
     { href: "/seller/projects", label: "Browse Projects", icon: BriefcaseBusiness },
     { href: "/seller/my-bids", label: "My Bids", icon: Gavel },
-    { href: "/seller/profile", label: "Profile", icon: Users }
+    { href: "/seller/profile", label: "Profile", icon: Users },
+    { href: "/reviews", label: "Reviews", icon: Star },
+    { href: "/messages", label: "Messages", icon: MessageCircle },
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    { href: "/settings", label: "Settings", icon: Settings }
   ],
   admin: [
     { href: "/admin/dashboard", label: "Admin Dashboard", icon: Gauge },
     { href: "/admin/users", label: "User Management", icon: Users },
     { href: "/admin/moderation", label: "Project Moderation", icon: ShieldCheck },
-    { href: "/admin/disputes", label: "Disputes", icon: Gavel }
+    { href: "/admin/disputes", label: "Disputes", icon: Gavel },
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    { href: "/messages", label: "Messages", icon: MessageCircle },
+    { href: "/settings", label: "Settings", icon: Settings }
   ]
+};
+
+const isLinkActive = (pathname: string, href: string) => {
+  if (pathname === href) {
+    return true;
+  }
+
+  if (href === "/buyer/projects") {
+    return pathname.startsWith("/buyer/projects/") && !pathname.startsWith("/buyer/projects/create");
+  }
+
+  return pathname.startsWith(`${href}/`);
 };
 
 export function Sidebar({ role }: { role: UserRole }) {
   const pathname = usePathname();
-  const links = [...roleLinks[role], ...commonLinks];
+  const links = roleLinks[role];
 
   return (
     <aside className="hidden w-72 p-3 lg:block">
@@ -48,7 +83,7 @@ export function Sidebar({ role }: { role: UserRole }) {
         <nav className="space-y-1 p-4">
           {links.map((link) => {
             const Icon = link.icon;
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const active = isLinkActive(pathname, link.href);
             return (
               <Link
                 key={link.href}

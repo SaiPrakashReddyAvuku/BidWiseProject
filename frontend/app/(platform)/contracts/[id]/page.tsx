@@ -11,6 +11,15 @@ export default function ContractPage() {
   const contract = useBidWiseStore((state) =>
     state.contracts.find((item) => item.bidId === id || item.id === id)
   );
+  const loading = useBidWiseStore((state) => state.loading);
+
+  if (!contract && loading) {
+    return (
+      <Card>
+        <CardHeader><CardTitle>Loading contract...</CardTitle></CardHeader>
+      </Card>
+    );
+  }
 
   if (!contract) {
     return (
@@ -35,5 +44,3 @@ export default function ContractPage() {
     </Card>
   );
 }
-
-

@@ -15,6 +15,7 @@ import com.bidwise.backend.entity.enums.NotificationType;
 import com.bidwise.backend.entity.enums.PaymentStatus;
 import com.bidwise.backend.entity.enums.ProjectStatus;
 import com.bidwise.backend.entity.enums.UserRole;
+import com.bidwise.backend.exception.ConflictException;
 import com.bidwise.backend.exception.NotFoundException;
 import com.bidwise.backend.exception.UnauthorizedException;
 import com.bidwise.backend.mapper.DtoMapper;
@@ -69,7 +70,7 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<ProjectResponse> listProjects(ProjectStatus status, UUID buyerId, int page, int size) {
         var pageable = PageRequest.of(page, size);
 
@@ -79,15 +80,19 @@ public class ProjectServiceImpl implements ProjectService {
                 ? projectRepository.findAllByStatus(status, pageable)
                 : projectRepository.findAll(pageable);
 
-        var mapped = projects.map(project -> DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(project.getId())));
+        var mapped = projects.map(project -> {
+            backfillCompletedState(project);
+            return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(project.getId()));
+        });
         return PageMapper.map(mapped);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ProjectResponse getProject(UUID projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
+        backfillCompletedState(project);
         return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(projectId));
     }
 
@@ -133,11 +138,32 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
 
-        Bid accepted = bidRepository.findById(bidId)
+        Bid selectedBid = bidRepository.findById(bidId)
                 .orElseThrow(() -> new NotFoundException("Bid not found: " + bidId));
 
-        if (!accepted.getProjectId().equals(projectId)) {
+        if (!selectedBid.getProjectId().equals(projectId)) {
             throw new NotFoundException("Bid does not belong to project");
+        }
+
+        var existingProjectContract = contractRepository.findByProjectId(projectId);
+        if (existingProjectContract.isPresent()) {
+            Contract contract = existingProjectContract.get();
+            if (contract.getBidId().equals(bidId)) {
+                ensureProjectCompleted(project, contract);
+                return DtoMapper.toContractResponse(contract);
+            }
+            throw new ConflictException("A bid has already been accepted for this project");
+        }
+
+        var existingBidContract = contractRepository.findByBidId(bidId);
+        if (existingBidContract.isPresent()) {
+            Contract contract = existingBidContract.get();
+            ensureProjectCompleted(project, contract);
+            return DtoMapper.toContractResponse(contract);
+        }
+
+        if (selectedBid.getStatus() != BidStatus.PENDING) {
+            throw new ConflictException("Only pending bids can be accepted");
         }
 
         List<Bid> projectBids = bidRepository.findAllByProjectId(projectId);
@@ -145,26 +171,40 @@ public class ProjectServiceImpl implements ProjectService {
             bid.setStatus(bid.getId().equals(bidId) ? BidStatus.ACCEPTED : BidStatus.REJECTED);
         }
 
-        project.setStatus(ProjectStatus.IN_PROGRESS);
+        project.setStatus(ProjectStatus.COMPLETED);
 
         Contract contract = contractRepository.save(Contract.builder()
-                .bidId(accepted.getId())
+                .bidId(selectedBid.getId())
                 .projectId(projectId)
                 .buyerId(project.getBuyerId())
-                .sellerId(accepted.getSellerId())
+                .sellerId(selectedBid.getSellerId())
                 .paymentStatus(PaymentStatus.PENDING)
-                .progress(0)
+                .progress(100)
                 .build());
 
         notificationRepository.save(Notification.builder()
-                .userId(accepted.getSellerId())
-                .title("Bid accepted")
-                .message("Your bid for project " + project.getTitle() + " was accepted")
+                .userId(selectedBid.getSellerId())
+                .title("Bid accepted and project completed")
+                .message("Your bid for project " + project.getTitle() + " was accepted and marked completed")
                 .type(NotificationType.PROJECT)
                 .isRead(false)
                 .build());
 
         return DtoMapper.toContractResponse(contract);
+    }
+
+    private void backfillCompletedState(Project project) {
+        contractRepository.findByProjectId(project.getId())
+                .ifPresent(contract -> ensureProjectCompleted(project, contract));
+    }
+
+    private void ensureProjectCompleted(Project project, Contract contract) {
+        if (project.getStatus() != ProjectStatus.COMPLETED) {
+            project.setStatus(ProjectStatus.COMPLETED);
+        }
+        if (contract.getProgress() == null || contract.getProgress() < 100) {
+            contract.setProgress(100);
+        }
     }
 
     @Override
@@ -182,10 +222,67 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    @Transactional
+    public ProjectResponse completeProject(UUID projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
+
+        if (project.getStatus() == ProjectStatus.COMPLETED) {
+            backfillCompletedState(project);
+            return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(projectId));
+        }
+
+        if (project.getStatus() != ProjectStatus.IN_PROGRESS) {
+            throw new ConflictException("Project can be completed only after a bid is accepted");
+        }
+
+        project.setStatus(ProjectStatus.COMPLETED);
+
+        contractRepository.findByProjectId(projectId).ifPresent(contract -> contract.setProgress(100));
+
+        bidRepository.findAllByProjectId(projectId).stream()
+                .filter(bid -> bid.getStatus() == BidStatus.ACCEPTED)
+                .findFirst()
+                .ifPresent(acceptedBid -> notificationRepository.save(Notification.builder()
+                        .userId(acceptedBid.getSellerId())
+                        .title("Project completed")
+                        .message("Buyer marked project " + project.getTitle() + " as completed")
+                        .type(NotificationType.PROJECT)
+                        .isRead(false)
+                        .build()));
+
+        backfillCompletedState(project);
+        return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(projectId));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PageResponse<BidResponse> getSellerBids(UUID sellerId, int page, int size) {
         var pageable = PageRequest.of(page, size);
         var bids = bidRepository.findAllBySellerId(sellerId, pageable).map(DtoMapper::toBidResponse);
         return PageMapper.map(bids);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ContractResponse> getContractsForUser(UUID userId, int page, int size) {
+        var pageable = PageRequest.of(page, size);
+        var contracts = contractRepository
+                .findAllByBuyerIdOrSellerId(userId, userId, pageable)
+                .map(DtoMapper::toContractResponse);
+        return PageMapper.map(contracts);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ContractResponse getContract(UUID contractId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new NotFoundException("Contract not found: " + contractId));
+        return DtoMapper.toContractResponse(contract);
+    }
 }
+
+
+
+
+

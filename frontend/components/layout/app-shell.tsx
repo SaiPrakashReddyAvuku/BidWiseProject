@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ReactNode, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button";
 export function AppShell({ children }: { children: ReactNode }) {
   const user = useBidWiseStore((state) => state.currentUser);
   const syncForCurrentUser = useBidWiseStore((state) => state.syncForCurrentUser);
+  const userId = user?.id;
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       void syncForCurrentUser();
     }
-  }, [syncForCurrentUser, user]);
+  }, [syncForCurrentUser, userId]);
 
   if (!user) {
     return (
