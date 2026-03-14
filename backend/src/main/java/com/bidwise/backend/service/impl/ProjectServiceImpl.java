@@ -9,9 +9,11 @@ import com.bidwise.backend.dto.project.ProjectResponse;
 import com.bidwise.backend.entity.Bid;
 import com.bidwise.backend.entity.Contract;
 import com.bidwise.backend.entity.Notification;
+import com.bidwise.backend.entity.Order;
 import com.bidwise.backend.entity.Project;
 import com.bidwise.backend.entity.enums.BidStatus;
 import com.bidwise.backend.entity.enums.NotificationType;
+import com.bidwise.backend.entity.enums.OrderStatus;
 import com.bidwise.backend.entity.enums.PaymentStatus;
 import com.bidwise.backend.entity.enums.ProjectStatus;
 import com.bidwise.backend.entity.enums.UserRole;
@@ -22,8 +24,10 @@ import com.bidwise.backend.mapper.DtoMapper;
 import com.bidwise.backend.repository.BidRepository;
 import com.bidwise.backend.repository.ContractRepository;
 import com.bidwise.backend.repository.NotificationRepository;
+import com.bidwise.backend.repository.OrderRepository;
 import com.bidwise.backend.repository.ProjectRepository;
 import com.bidwise.backend.repository.UserRepository;
+import com.bidwise.backend.service.EmailService;
 import com.bidwise.backend.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Service
@@ -40,8 +46,10 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRepository projectRepository;
     private final BidRepository bidRepository;
     private final ContractRepository contractRepository;
+    private final OrderRepository orderRepository;
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -66,7 +74,20 @@ public class ProjectServiceImpl implements ProjectService {
                 .build();
 
         Project saved = projectRepository.save(project);
-        return DtoMapper.toProjectResponse(saved, 0);
+        return toProjectResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public PageResponse<ProjectResponse> listBuyerProjects(String buyerEmail, ProjectStatus status, int page, int size) {
+        var buyer = userRepository.findByEmailIgnoreCase(buyerEmail)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+
+        if (buyer.getRole() != UserRole.BUYER) {
+            throw new UnauthorizedException("Only buyer accounts can view buyer projects");
+        }
+
+        return listProjects(status, buyer.getId(), page, size);
     }
 
     @Override
@@ -82,7 +103,7 @@ public class ProjectServiceImpl implements ProjectService {
 
         var mapped = projects.map(project -> {
             backfillCompletedState(project);
-            return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(project.getId()));
+            return toProjectResponse(project);
         });
         return PageMapper.map(mapped);
     }
@@ -93,7 +114,7 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
         backfillCompletedState(project);
-        return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(projectId));
+        return toProjectResponse(project);
     }
 
     @Override
@@ -134,9 +155,20 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public ContractResponse acceptBid(UUID projectId, UUID bidId) {
+    public ContractResponse acceptBid(UUID projectId, UUID bidId, String buyerEmail) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
+
+        var buyer = userRepository.findByEmailIgnoreCase(buyerEmail)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+
+        if (buyer.getRole() != UserRole.BUYER) {
+            throw new UnauthorizedException("Only buyer accounts can accept bids");
+        }
+
+        if (!project.getBuyerId().equals(buyer.getId())) {
+            throw new UnauthorizedException("Only the project owner can accept bids");
+        }
 
         Bid selectedBid = bidRepository.findById(bidId)
                 .orElseThrow(() -> new NotFoundException("Bid not found: " + bidId));
@@ -145,21 +177,23 @@ public class ProjectServiceImpl implements ProjectService {
             throw new NotFoundException("Bid does not belong to project");
         }
 
-        var existingProjectContract = contractRepository.findByProjectId(projectId);
-        if (existingProjectContract.isPresent()) {
-            Contract contract = existingProjectContract.get();
-            if (contract.getBidId().equals(bidId)) {
-                ensureProjectCompleted(project, contract);
-                return DtoMapper.toContractResponse(contract);
+        var existingProjectOrder = orderRepository.findByProjectId(projectId);
+        if (existingProjectOrder.isPresent()) {
+            Order order = existingProjectOrder.get();
+            if (order.getBidId().equals(bidId)) {
+                ensureProjectStatusFromOrder(project, order);
+                return DtoMapper.toContractResponse(contractRepository.findByBidId(bidId)
+                        .orElseThrow(() -> new ConflictException("Accepted bid is missing a contract")));
             }
             throw new ConflictException("A bid has already been accepted for this project");
         }
 
-        var existingBidContract = contractRepository.findByBidId(bidId);
-        if (existingBidContract.isPresent()) {
-            Contract contract = existingBidContract.get();
-            ensureProjectCompleted(project, contract);
-            return DtoMapper.toContractResponse(contract);
+        var existingBidOrder = orderRepository.findByBidId(bidId);
+        if (existingBidOrder.isPresent()) {
+            Order order = existingBidOrder.get();
+            ensureProjectStatusFromOrder(project, order);
+            return DtoMapper.toContractResponse(contractRepository.findByBidId(bidId)
+                    .orElseThrow(() -> new ConflictException("Accepted bid is missing a contract")));
         }
 
         if (selectedBid.getStatus() != BidStatus.PENDING) {
@@ -171,7 +205,7 @@ public class ProjectServiceImpl implements ProjectService {
             bid.setStatus(bid.getId().equals(bidId) ? BidStatus.ACCEPTED : BidStatus.REJECTED);
         }
 
-        project.setStatus(ProjectStatus.COMPLETED);
+        project.setStatus(ProjectStatus.IN_PROGRESS);
 
         Contract contract = contractRepository.save(Contract.builder()
                 .bidId(selectedBid.getId())
@@ -179,31 +213,62 @@ public class ProjectServiceImpl implements ProjectService {
                 .buyerId(project.getBuyerId())
                 .sellerId(selectedBid.getSellerId())
                 .paymentStatus(PaymentStatus.PENDING)
-                .progress(100)
+                .progress(0)
+                .build());
+
+        Order order = orderRepository.save(Order.builder()
+                .bidId(selectedBid.getId())
+                .projectId(projectId)
+                .buyerId(project.getBuyerId())
+                .sellerId(selectedBid.getSellerId())
+                .price(BigDecimal.valueOf(selectedBid.getPrice()))
+                .status(OrderStatus.CREATED)
                 .build());
 
         notificationRepository.save(Notification.builder()
                 .userId(selectedBid.getSellerId())
-                .title("Bid accepted and project completed")
-                .message("Your bid for project " + project.getTitle() + " was accepted and marked completed")
+                .title("Bid accepted")
+                .message("Your bid for project " + project.getTitle() + " was accepted. Order " + order.getId() + " created.")
                 .type(NotificationType.PROJECT)
                 .isRead(false)
                 .build());
+
+        notificationRepository.save(Notification.builder()
+                .userId(project.getBuyerId())
+                .title("Order created")
+                .message("Order " + order.getId() + " was created for project " + project.getTitle())
+                .type(NotificationType.PROJECT)
+                .isRead(false)
+                .build());
+
+        userRepository.findById(selectedBid.getSellerId()).ifPresent(seller ->
+                emailService.sendEmail(seller.getEmail(), "Bid accepted", "Your bid was accepted. Order " + order.getId() + " is created.")
+        );
 
         return DtoMapper.toContractResponse(contract);
     }
 
     private void backfillCompletedState(Project project) {
-        contractRepository.findByProjectId(project.getId())
-                .ifPresent(contract -> ensureProjectCompleted(project, contract));
-    }
+        var order = orderRepository.findByProjectId(project.getId());
+        if (order.isPresent()) {
+            ensureProjectStatusFromOrder(project, order.get());
+            return;
+        }
 
-    private void ensureProjectCompleted(Project project, Contract contract) {
-        if (project.getStatus() != ProjectStatus.COMPLETED) {
+        if (project.getStatus() == ProjectStatus.COMPLETED) {
+            return;
+        }
+
+        if (isDeadlinePassed(project) && !hasAcceptedBid(project.getId())) {
             project.setStatus(ProjectStatus.COMPLETED);
         }
-        if (contract.getProgress() == null || contract.getProgress() < 100) {
-            contract.setProgress(100);
+    }
+
+    private void ensureProjectStatusFromOrder(Project project, Order order) {
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            project.setStatus(ProjectStatus.COMPLETED);
+        } else {
+            project.setStatus(ProjectStatus.IN_PROGRESS);
         }
     }
 
@@ -223,22 +288,38 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public ProjectResponse completeProject(UUID projectId) {
+    public ProjectResponse completeProject(UUID projectId, String buyerEmail) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
 
-        if (project.getStatus() == ProjectStatus.COMPLETED) {
-            backfillCompletedState(project);
-            return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(projectId));
+        var buyer = userRepository.findByEmailIgnoreCase(buyerEmail)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+
+        if (buyer.getRole() != UserRole.BUYER) {
+            throw new UnauthorizedException("Only buyer accounts can complete projects");
         }
 
-        if (project.getStatus() != ProjectStatus.IN_PROGRESS) {
-            throw new ConflictException("Project can be completed only after a bid is accepted");
+        if (!project.getBuyerId().equals(buyer.getId())) {
+            throw new UnauthorizedException("Only the project owner can complete the project");
         }
 
+        Order order = orderRepository.findByProjectId(projectId)
+                .orElseThrow(() -> new ConflictException("No order exists for this project"));
+
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            project.setStatus(ProjectStatus.COMPLETED);
+            return toProjectResponse(project);
+        }
+
+        if (order.getStatus() != OrderStatus.DELIVERED) {
+            throw new ConflictException("Order must be delivered before completing the project");
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
         project.setStatus(ProjectStatus.COMPLETED);
 
-        contractRepository.findByProjectId(projectId).ifPresent(contract -> contract.setProgress(100));
+        contractRepository.findByProjectId(projectId)
+                .ifPresent(contract -> contract.setProgress(100));
 
         bidRepository.findAllByProjectId(projectId).stream()
                 .filter(bid -> bid.getStatus() == BidStatus.ACCEPTED)
@@ -246,13 +327,39 @@ public class ProjectServiceImpl implements ProjectService {
                 .ifPresent(acceptedBid -> notificationRepository.save(Notification.builder()
                         .userId(acceptedBid.getSellerId())
                         .title("Project completed")
-                        .message("Buyer marked project " + project.getTitle() + " as completed")
+                        .message("Buyer confirmed delivery and completed project " + project.getTitle())
                         .type(NotificationType.PROJECT)
                         .isRead(false)
                         .build()));
 
         backfillCompletedState(project);
-        return DtoMapper.toProjectResponse(project, bidRepository.countByProjectId(projectId));
+        return toProjectResponse(project);
+    }
+
+    private ProjectResponse toProjectResponse(Project project) {
+        long bidsCount = bidRepository.countByProjectId(project.getId());
+        String closureReason = resolveClosureReason(project);
+        return DtoMapper.toProjectResponse(project, bidsCount, closureReason);
+    }
+
+    private String resolveClosureReason(Project project) {
+        if (project.getStatus() != ProjectStatus.COMPLETED) {
+            return null;
+        }
+
+        if (isDeadlinePassed(project) && !hasAcceptedBid(project.getId())) {
+            return "No bid accepted before deadline";
+        }
+
+        return null;
+    }
+
+    private boolean isDeadlinePassed(Project project) {
+        return project.getDeadline() != null && project.getDeadline().isBefore(LocalDate.now());
+    }
+
+    private boolean hasAcceptedBid(UUID projectId) {
+        return bidRepository.existsByProjectIdAndStatus(projectId, BidStatus.ACCEPTED);
     }
 
     @Override

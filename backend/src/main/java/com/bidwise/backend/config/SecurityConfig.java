@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/payments/webhook",
                                 "/api/health/**",
                                 "/swagger-ui/**",
                                 "/api-docs/**",

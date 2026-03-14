@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { AttachmentList } from "@/components/projects/attachment-list";
 import { BidTable } from "@/components/projects/bid-table";
+import { OrderStatusBadge, PaymentStatusBadge } from "@/components/orders/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +18,11 @@ export default function BuyerProjectDetailsPage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const projects = useBidWiseStore((state) => state.projects);
   const allBids = useBidWiseStore((state) => state.bids);
+  const orders = useBidWiseStore((state) => state.orders);
   const users = useBidWiseStore((state) => state.users);
   const acceptBid = useBidWiseStore((state) => state.acceptBid);
   const rejectBid = useBidWiseStore((state) => state.rejectBid);
-  const completeProject = useBidWiseStore((state) => state.completeProject);
+  const completeOrder = useBidWiseStore((state) => state.completeOrder);
   const [actionError, setActionError] = useState("");
   const [completionError, setCompletionError] = useState("");
 
@@ -32,12 +34,17 @@ export default function BuyerProjectDetailsPage() {
     () => allBids.filter((bid) => bid.projectId === id),
     [allBids, id]
   );
+  const order = useMemo(
+    () => orders.find((item) => item.projectId === id),
+    [orders, id]
+  );
 
   if (!project) return <RoleGuard role="buyer"><p>Project not found.</p></RoleGuard>;
 
   const lowestBid = bids.slice().sort((a, b) => a.price - b.price)[0];
+  const deliveryCompleted = order?.status === "delivered" || order?.status === "completed";
   const reviewEligibleBids = bids.filter((bid) =>
-    (project.status === "completed" && bid.status === "accepted") || bid.status === "rejected"
+    (deliveryCompleted && bid.status === "accepted") || bid.status === "rejected"
   );
 
   const onAccept = async (bidId: string) => {
@@ -58,10 +65,13 @@ export default function BuyerProjectDetailsPage() {
     }
   };
 
-  const onCompleteProject = async () => {
+  const onConfirmDelivery = async () => {
     setCompletionError("");
     try {
-      await completeProject(project.id);
+      if (!order) {
+        throw new Error("No active order found for this project.");
+      }
+      await completeOrder(order.id);
     } catch (error) {
       setCompletionError(error instanceof Error ? error.message : "Failed to complete project.");
     }
@@ -76,9 +86,9 @@ export default function BuyerProjectDetailsPage() {
               <CardTitle>{project.title}</CardTitle>
               <div className="flex items-center gap-2">
                 <Badge variant={project.status === "open" ? "success" : "secondary"}>{project.status}</Badge>
-                {project.status === "in_progress" ? (
-                  <Button size="sm" onClick={() => void onCompleteProject()}>
-                    Mark as Completed
+                {order?.status === "delivered" ? (
+                  <Button size="sm" onClick={() => void onConfirmDelivery()}>
+                    Confirm Delivery
                   </Button>
                 ) : null}
               </div>
@@ -88,15 +98,33 @@ export default function BuyerProjectDetailsPage() {
             <p>{project.description}</p>
             <p>Budget: {formatCurrency(project.budget)}</p>
             <p>Deadline: {formatDate(project.deadline)}</p>
+            {project.closureReason ? (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Closure reason</span>
+                <Badge variant="warning">{project.closureReason}</Badge>
+              </div>
+            ) : null}
             <div>
               <p className="mb-1">Attachments</p>
               <AttachmentList attachments={project.attachments} />
             </div>
+            {order ? (
+              <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Order status</span>
+                  <OrderStatusBadge status={order.status} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Payment</span>
+                  <PaymentStatusBadge status={order.paymentStatus} />
+                </div>
+              </div>
+            ) : null}
             {completionError ? <p className="text-sm text-red-500">{completionError}</p> : null}
             <div className="flex gap-2">
               <Button variant="outline">Message vendor</Button>
               <Link href={`/buyer/bids/compare/${project.id}`} className="text-primary">Open comparison table</Link>
-              {lowestBid ? <Link href={`/contracts/${lowestBid.id}`} className="text-primary">View contract</Link> : null}
+              {order ? <Link href={`/orders/${order.id}`} className="text-primary">View order</Link> : null}
             </div>
           </CardContent>
         </Card>
@@ -121,7 +149,7 @@ export default function BuyerProjectDetailsPage() {
           <CardHeader><CardTitle>Review Eligibility</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             {reviewEligibleBids.length === 0 ? (
-              <p className="text-muted-foreground">Write Review appears once a bidder is rejected or a delivered project is completed.</p>
+              <p className="text-muted-foreground">Write Review appears once a bidder is rejected or the order is delivered.</p>
             ) : (
               reviewEligibleBids.map((bid) => {
                 const seller = users.find((user) => user.id === bid.sellerId);

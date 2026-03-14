@@ -3,6 +3,7 @@ package com.bidwise.backend.service.auth;
 import com.bidwise.backend.dto.auth.AuthLoginRequest;
 import com.bidwise.backend.dto.auth.AuthRegisterRequest;
 import com.bidwise.backend.dto.auth.AuthResponse;
+import com.bidwise.backend.dto.auth.AuthResetPasswordRequest;
 import com.bidwise.backend.entity.UserEntity;
 import com.bidwise.backend.entity.enums.UserRole;
 import com.bidwise.backend.exception.ConflictException;
@@ -68,5 +69,13 @@ public class AuthServiceImpl implements AuthService {
 
         String token = jwtService.generateToken(user);
         return new AuthResponse(token, DtoMapper.toUserResponse(user));
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(AuthResetPasswordRequest request) {
+        UserEntity user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
     }
 }

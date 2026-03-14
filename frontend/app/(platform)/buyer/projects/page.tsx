@@ -31,7 +31,6 @@ export default function BuyerProjectsPage() {
       projects.map((project) => {
         const projectBids = getProjectSpecificBids(bids, project.id);
         const acceptedBid = projectBids.find((item) => item.status === "accepted");
-        const rejectedBidCount = projectBids.filter((item) => item.status === "rejected").length;
         const winningSeller = acceptedBid
           ? users.find((user) => user.id === acceptedBid.sellerId)
           : undefined;
@@ -40,9 +39,8 @@ export default function BuyerProjectsPage() {
           project,
           bidCount: projectBids.length,
           acceptedBid,
-          rejectedBidCount,
           winningSeller,
-          isClosed: project.status === "completed" || rejectedBidCount > 0
+          isClosed: project.status === "completed"
         };
       }),
     [bids, projects, users]
@@ -121,9 +119,14 @@ export default function BuyerProjectsPage() {
                         <TableRow key={row.project.id}>
                           <TableCell>{row.project.title}</TableCell>
                           <TableCell>
-                            <Badge variant={row.project.status === "completed" ? "success" : "secondary"}>
-                              {row.project.status}
-                            </Badge>
+                            <div className="space-y-1">
+                              <Badge variant={row.project.status === "completed" ? "success" : "secondary"}>
+                                {row.project.status}
+                              </Badge>
+                              {row.project.closureReason ? (
+                                <Badge variant="warning" className="w-fit">{row.project.closureReason}</Badge>
+                              ) : null}
+                            </div>
                           </TableCell>
                           <TableCell>{formatDate(row.project.deadline)}</TableCell>
                           <TableCell>{row.bidCount}</TableCell>

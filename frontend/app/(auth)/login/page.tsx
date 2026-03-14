@@ -55,7 +55,6 @@ export default function LoginPage() {
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
             <Button type="submit" className="w-full">Login</Button>
             <div className="flex justify-between text-sm">
-              <Link href="/forgot-password" className="text-primary">Forgot password?</Link>
               <Link href="/register" className="text-primary">Create account</Link>
             </div>
           </form>

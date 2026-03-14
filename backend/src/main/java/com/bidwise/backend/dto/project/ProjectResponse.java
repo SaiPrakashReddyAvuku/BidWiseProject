@@ -19,6 +19,7 @@ public record ProjectResponse(
         List<String> attachments,
         ProjectStatus status,
         long bidsCount,
+        String closureReason,
         Instant createdAt,
         Instant updatedAt
 ) {

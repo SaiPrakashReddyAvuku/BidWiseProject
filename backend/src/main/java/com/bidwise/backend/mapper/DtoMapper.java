@@ -5,10 +5,12 @@ import com.bidwise.backend.dto.contract.ContractResponse;
 import com.bidwise.backend.dto.dispute.DisputeResponse;
 import com.bidwise.backend.dto.message.MessageResponse;
 import com.bidwise.backend.dto.notification.NotificationResponse;
+import com.bidwise.backend.dto.order.OrderResponse;
 import com.bidwise.backend.dto.project.ProjectResponse;
 import com.bidwise.backend.dto.review.ReviewResponse;
 import com.bidwise.backend.dto.user.UserResponse;
 import com.bidwise.backend.entity.*;
+import com.bidwise.backend.entity.enums.PaymentStatus;
 
 public final class DtoMapper {
 
@@ -30,7 +32,7 @@ public final class DtoMapper {
         );
     }
 
-    public static ProjectResponse toProjectResponse(Project project, long bidsCount) {
+    public static ProjectResponse toProjectResponse(Project project, long bidsCount, String closureReason) {
         return new ProjectResponse(
                 project.getId(),
                 project.getBuyerId(),
@@ -43,6 +45,7 @@ public final class DtoMapper {
                 project.getAttachments(),
                 project.getStatus(),
                 bidsCount,
+                closureReason,
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );
@@ -70,6 +73,27 @@ public final class DtoMapper {
                 contract.getSellerId(),
                 contract.getPaymentStatus(),
                 contract.getProgress()
+        );
+    }
+
+    public static OrderResponse toOrderResponse(Order order) {
+        return toOrderResponse(order, null);
+    }
+
+    public static OrderResponse toOrderResponse(Order order, PaymentStatus paymentStatus) {
+        return new OrderResponse(
+                order.getId(),
+                order.getProjectId(),
+                order.getBidId(),
+                order.getBuyerId(),
+                order.getSellerId(),
+                order.getPrice(),
+                order.getStatus(),
+                paymentStatus,
+                order.getDeliveryType(),
+                order.getDeliveryAddress(),
+                order.getDeliveryInstructions(),
+                order.getCreatedAt()
         );
     }
 

@@ -24,6 +24,7 @@ export type Project = {
   location: string;
   attachments: string[];
   status: "open" | "in_progress" | "completed";
+  closureReason?: string | null;
   createdAt: string;
   flagged?: boolean;
 };
@@ -64,9 +65,28 @@ export type Contract = {
   bidId: string;
   buyerId: string;
   sellerId: string;
-  paymentStatus: "pending" | "paid";
+  paymentStatus: "pending" | "paid" | "failed";
   progress: number;
   timeline: string[];
+};
+
+export type OrderStatus = "created" | "preparing" | "shipped" | "delivered" | "completed";
+export type PaymentStatus = "pending" | "paid" | "failed";
+export type DeliveryType = "digital" | "physical";
+
+export type Order = {
+  id: string;
+  projectId: string;
+  bidId: string;
+  buyerId: string;
+  sellerId: string;
+  price: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  deliveryType?: DeliveryType;
+  deliveryAddress?: string;
+  deliveryInstructions?: string;
+  createdAt: string;
 };
 
 export type Review = {

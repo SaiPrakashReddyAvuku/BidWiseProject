@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api, setAuthToken } from "@/features/services/api";
-import { Bid, Contract, Dispute, Message, Notification, Project, Review, User, UserRole } from "@/types";
+import { Bid, Contract, DeliveryType, Dispute, Message, Notification, Order, Project, Review, User, UserRole } from "@/types";
 
 type RegisterPayload = {
   name: string;
@@ -45,6 +45,7 @@ type BidWiseState = {
   notifications: Notification[];
   messages: Message[];
   contracts: Contract[];
+  orders: Order[];
   reviews: Review[];
   disputes: Dispute[];
   currentUser: User | null;
@@ -59,6 +60,14 @@ type BidWiseState = {
   acceptBid: (bidId: string) => Promise<void>;
   rejectBid: (bidId: string) => Promise<void>;
   completeProject: (projectId: string) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: Order["status"]) => Promise<void>;
+  completeOrder: (orderId: string) => Promise<void>;
+  createPaymentIntent: (orderId: string) => Promise<string>;
+  updateOrderDelivery: (orderId: string, payload: {
+    deliveryType: DeliveryType;
+    deliveryAddress?: string;
+    deliveryInstructions?: string;
+  }) => Promise<void>;
   sendMessage: (toUserId: string, content: string, attachment?: string) => Promise<void>;
   refreshConversation: (peerId: string) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
@@ -67,6 +76,7 @@ type BidWiseState = {
   resolveDispute: (id: string) => Promise<void>;
   updateSettings: (payload: SettingsPayload) => Promise<void>;
   addReview: (toUserId: string, rating: number, comment: string) => Promise<void>;
+  resetPassword: (newPassword: string) => Promise<string>;
 };
 
 const uniqueById = <T extends { id: string }>(items: T[]): T[] => {
@@ -84,6 +94,7 @@ export const useBidWiseStore = create<BidWiseState>()(
       notifications: [],
       messages: [],
       contracts: [],
+      orders: [],
       reviews: [],
       disputes: [],
       currentUser: null,
@@ -147,7 +158,7 @@ export const useBidWiseStore = create<BidWiseState>()(
           let disputes: Dispute[] = [];
 
           if (resolvedCurrentUser.role === "buyer") {
-            projects = await api.getBuyerProjects(resolvedCurrentUser.id);
+            projects = await api.getBuyerProjects();
             const bidsByProject = await Promise.all(projects.map((project) => api.getProjectBids(project.id)));
             bids = uniqueById(bidsByProject.flat());
           }
@@ -169,6 +180,7 @@ export const useBidWiseStore = create<BidWiseState>()(
           const notifications = await api.getNotifications(resolvedCurrentUser.id);
           const reviews = await api.getReviewsForUser(resolvedCurrentUser.id);
           const contracts = await api.getContractsForUser(resolvedCurrentUser.id);
+          const orders = await api.getOrders();
 
           set((state) => ({
             users: uniqueById([...safeUsers, ...state.users]),
@@ -178,6 +190,7 @@ export const useBidWiseStore = create<BidWiseState>()(
             notifications,
             reviews: uniqueById([...reviews, ...state.reviews]),
             contracts,
+            orders,
             disputes,
             loading: false
           }));
@@ -247,6 +260,51 @@ export const useBidWiseStore = create<BidWiseState>()(
         set({ loading: true });
         try {
           await api.completeProject(projectId);
+          await get().syncForCurrentUser();
+        } catch (error) {
+          set({ loading: false });
+          throw error;
+        }
+      },
+
+      updateOrderStatus: async (orderId, status) => {
+        set({ loading: true });
+        try {
+          await api.updateOrderStatus(orderId, status);
+          await get().syncForCurrentUser();
+        } catch (error) {
+          set({ loading: false });
+          throw error;
+        }
+      },
+
+      completeOrder: async (orderId) => {
+        set({ loading: true });
+        try {
+          await api.completeOrder(orderId);
+          await get().syncForCurrentUser();
+        } catch (error) {
+          set({ loading: false });
+          throw error;
+        }
+      },
+
+      createPaymentIntent: async (orderId) => {
+        set({ loading: true });
+        try {
+          const res = await api.createPaymentIntent(orderId);
+          await get().syncForCurrentUser();
+          return res.clientSecret;
+        } catch (error) {
+          set({ loading: false });
+          throw error;
+        }
+      },
+
+      updateOrderDelivery: async (orderId, payload) => {
+        set({ loading: true });
+        try {
+          await api.updateOrderDelivery(orderId, payload);
           await get().syncForCurrentUser();
         } catch (error) {
           set({ loading: false });
@@ -351,6 +409,16 @@ export const useBidWiseStore = create<BidWiseState>()(
         } catch (error) {
           throw error;
         }
+      },
+
+      resetPassword: async (newPassword) => {
+        const currentUser = get().currentUser;
+        if (!currentUser) {
+          throw new Error("Please login to reset your password.");
+        }
+
+        const message = await api.resetPassword(currentUser.id, newPassword);
+        return message;
       }
     }),
     {

@@ -7,13 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBidWiseStore } from "@/features/store/use-bidwise-store";
 
-const resolveInitialTheme = () => {
+const resolveInitialTheme = (): "light" | "dark" => {
   if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem("bidwise-theme");
   if (stored === "dark" || stored === "light") {
     return stored;
   }
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
+const applyTheme = (value: "light" | "dark") => {
+  const root = document.documentElement;
+  root.setAttribute("data-theme", value);
+  root.classList.toggle("dark", value === "dark");
 };
 
 export function Topbar() {
@@ -26,13 +32,13 @@ export function Topbar() {
   useEffect(() => {
     const initial = resolveInitialTheme();
     setTheme(initial);
-    document.documentElement.setAttribute("data-theme", initial);
+    applyTheme(initial);
   }, []);
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
+    applyTheme(next);
     window.localStorage.setItem("bidwise-theme", next);
   };
 

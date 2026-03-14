@@ -14,4 +14,5 @@ public interface BidRepository extends JpaRepository<Bid, UUID> {
     Page<Bid> findAllBySellerId(UUID sellerId, Pageable pageable);
     long countByProjectId(UUID projectId);
     long countBySellerIdAndStatus(UUID sellerId, BidStatus status);
+    boolean existsByProjectIdAndStatus(UUID projectId, BidStatus status);
 }

@@ -30,10 +30,10 @@ public class BuyerController {
 
     @GetMapping("/projects")
     public PageResponse<ProjectResponse> projects(@RequestParam(required = false) ProjectStatus status,
-                                                  @RequestParam(required = false) UUID buyerId,
                                                   @RequestParam(defaultValue = "0") int page,
-                                                  @RequestParam(defaultValue = "20") int size) {
-        return projectService.listProjects(status, buyerId, page, size);
+                                                  @RequestParam(defaultValue = "20") int size,
+                                                  Authentication authentication) {
+        return projectService.listBuyerProjects(authentication.getName(), status, page, size);
     }
 
     @GetMapping("/projects/{projectId}")
@@ -47,8 +47,10 @@ public class BuyerController {
     }
 
     @PatchMapping("/projects/{projectId}/bids/{bidId}/accept")
-    public ContractResponse acceptBid(@PathVariable UUID projectId, @PathVariable UUID bidId) {
-        return projectService.acceptBid(projectId, bidId);
+    public ContractResponse acceptBid(@PathVariable UUID projectId,
+                                      @PathVariable UUID bidId,
+                                      Authentication authentication) {
+        return projectService.acceptBid(projectId, bidId, authentication.getName());
     }
 
     @PatchMapping("/projects/{projectId}/bids/{bidId}/reject")
@@ -57,7 +59,7 @@ public class BuyerController {
     }
 
     @PatchMapping("/projects/{projectId}/complete")
-    public ProjectResponse completeProject(@PathVariable UUID projectId) {
-        return projectService.completeProject(projectId);
+    public ProjectResponse completeProject(@PathVariable UUID projectId, Authentication authentication) {
+        return projectService.completeProject(projectId, authentication.getName());
     }
 }

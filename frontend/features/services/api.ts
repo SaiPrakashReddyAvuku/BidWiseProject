@@ -1,4 +1,4 @@
-import { Bid, Contract, Dispute, Message, Notification, Project, Review, User, UserRole } from "@/types";
+import { Bid, Contract, DeliveryType, Dispute, Message, Notification, Order, Project, Review, User, UserRole } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api";
 let authToken: string | null = null;
@@ -40,6 +40,7 @@ type ApiProject = {
   attachments?: string[];
   status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "FLAGGED";
   bidsCount: number;
+  closureReason?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -103,10 +104,27 @@ type ApiContract = {
   progress: number;
 };
 
+type ApiOrder = {
+  id: string;
+  projectId: string;
+  bidId: string;
+  buyerId: string;
+  sellerId: string;
+  price: number;
+  status: "CREATED" | "PREPARING" | "SHIPPED" | "DELIVERED" | "COMPLETED";
+  paymentStatus: "PENDING" | "PAID" | "FAILED" | null;
+  deliveryType?: "DIGITAL" | "PHYSICAL" | null;
+  deliveryAddress?: string | null;
+  deliveryInstructions?: string | null;
+  createdAt: string;
+};
+
 type ApiAuthResponse = {
   token: string;
   user: ApiUser;
 };
+
+type ApiMessageResponse = { message: string };
 
 const toRole = (role: ApiUser["role"]): UserRole => role.toLowerCase() as UserRole;
 const toProjectStatus = (status: ApiProject["status"]): Project["status"] => {
@@ -116,6 +134,17 @@ const toProjectStatus = (status: ApiProject["status"]): Project["status"] => {
 };
 const toBidStatus = (status: ApiBid["status"]): Bid["status"] => status.toLowerCase() as Bid["status"];
 const toNotificationType = (type: ApiNotification["type"]): Notification["type"] => type.toLowerCase() as Notification["type"];
+const toOrderStatus = (status: ApiOrder["status"]): Order["status"] => status.toLowerCase() as Order["status"];
+const toPaymentStatus = (status: ApiOrder["paymentStatus"]): Order["paymentStatus"] => {
+  if (status === "PAID") return "paid";
+  if (status === "FAILED") return "failed";
+  return "pending";
+};
+const toDeliveryType = (value?: ApiOrder["deliveryType"]): DeliveryType | undefined => {
+  if (value === "DIGITAL") return "digital";
+  if (value === "PHYSICAL") return "physical";
+  return undefined;
+};
 
 const mapUser = (u: ApiUser): User => ({
   id: u.id,
@@ -141,6 +170,7 @@ const mapProject = (p: ApiProject): Project => ({
   location: p.location ?? "Remote",
   attachments: p.attachments ?? [],
   status: toProjectStatus(p.status),
+  closureReason: p.closureReason ?? undefined,
   createdAt: p.createdAt,
   flagged: p.status === "FLAGGED"
 });
@@ -199,9 +229,24 @@ const mapContract = (c: ApiContract): Contract => ({
   projectId: c.projectId,
   buyerId: c.buyerId,
   sellerId: c.sellerId,
-  paymentStatus: c.paymentStatus === "PAID" ? "paid" : "pending",
+  paymentStatus: c.paymentStatus === "PAID" ? "paid" : c.paymentStatus === "FAILED" ? "failed" : "pending",
   progress: c.progress,
   timeline: ["Bid accepted", "Contract generated"]
+});
+
+const mapOrder = (o: ApiOrder): Order => ({
+  id: o.id,
+  projectId: o.projectId,
+  bidId: o.bidId,
+  buyerId: o.buyerId,
+  sellerId: o.sellerId,
+  price: o.price,
+  status: toOrderStatus(o.status),
+  paymentStatus: toPaymentStatus(o.paymentStatus),
+  deliveryType: toDeliveryType(o.deliveryType),
+  deliveryAddress: o.deliveryAddress ?? undefined,
+  deliveryInstructions: o.deliveryInstructions ?? undefined,
+  createdAt: o.createdAt
 });
 
 const buildUrl = (path: string, params?: Record<string, string | number | undefined>) => {
@@ -266,6 +311,14 @@ export const api = {
     return { token: res.token, user: mapUser(res.user) };
   },
 
+  resetPassword: async (userId: string, newPassword: string): Promise<string> => {
+    const res = await request<ApiMessageResponse>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ userId, newPassword })
+    });
+    return res.message;
+  },
+
   register: async (payload: {
     name: string;
     email: string;
@@ -298,8 +351,8 @@ export const api = {
     return page.content.map(mapUser);
   },
 
-  getBuyerProjects: async (buyerId: string): Promise<Project[]> => {
-    const page = await request<ApiPage<ApiProject>>("/buyer/projects", undefined, { buyerId, page: 0, size: 200 });
+  getBuyerProjects: async (): Promise<Project[]> => {
+    const page = await request<ApiPage<ApiProject>>("/buyer/projects", undefined, { page: 0, size: 200 });
     return page.content.map(mapProject);
   },
 
@@ -309,7 +362,7 @@ export const api = {
   },
 
   getAllProjects: async (): Promise<Project[]> => {
-    const page = await request<ApiPage<ApiProject>>("/buyer/projects", undefined, { page: 0, size: 500 });
+    const page = await request<ApiPage<ApiProject>>("/admin/projects", undefined, { page: 0, size: 500 });
     return page.content.map(mapProject);
   },
 
@@ -418,6 +471,53 @@ export const api = {
     const contract = await request<ApiContract>(`/contracts/${id}`);
     return mapContract(contract);
   },
+
+  getOrders: async (): Promise<Order[]> => {
+    const page = await request<ApiPage<ApiOrder>>("/orders", undefined, { page: 0, size: 200 });
+    return page.content.map(mapOrder);
+  },
+
+  getOrder: async (orderId: string): Promise<Order> => {
+    const order = await request<ApiOrder>(`/orders/${orderId}`);
+    return mapOrder(order);
+  },
+
+  updateOrderStatus: async (orderId: string, status: Order["status"]): Promise<Order> => {
+    const order = await request<ApiOrder>(`/orders/${orderId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status: status.toUpperCase() })
+    });
+    return mapOrder(order);
+  },
+
+  updateOrderDelivery: async (orderId: string, payload: {
+    deliveryType: DeliveryType;
+    deliveryAddress?: string;
+    deliveryInstructions?: string;
+  }): Promise<Order> => {
+    const order = await request<ApiOrder>(`/orders/${orderId}/delivery`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        deliveryType: payload.deliveryType.toUpperCase(),
+        deliveryAddress: payload.deliveryAddress,
+        deliveryInstructions: payload.deliveryInstructions
+      })
+    });
+    return mapOrder(order);
+  },
+
+  completeOrder: async (orderId: string): Promise<Order> => {
+    const order = await request<ApiOrder>(`/orders/${orderId}/complete`, { method: "POST" });
+    return mapOrder(order);
+  },
+
+  createPaymentIntent: async (orderId: string): Promise<{ clientSecret: string }> => {
+    const res = await request<{ clientSecret: string }>("/payments/create-intent", {
+      method: "POST",
+      body: JSON.stringify({ orderId })
+    });
+    return res;
+  },
   createDispute: async (payload: { projectId: string; raisedBy: string; against: string; reason: string }): Promise<Dispute> => {
     const dispute = await request<ApiDispute>("/disputes", {
       method: "POST",
@@ -453,11 +553,3 @@ export const api = {
     return mapUser(user);
   }
 };
-
-
-
-
-
-
-
-
