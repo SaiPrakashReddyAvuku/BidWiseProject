@@ -1,0 +1,86 @@
+flowchart LR
+    %% BidWise reference map: frontend files -> store/api calls -> backend endpoints -> controller files
+
+    subgraph FE[Frontend files]
+        FLogin["frontend/app/(auth)/login/page.tsx"]
+        FRegister["frontend/app/(auth)/register/page.tsx"]
+        FCreateProject["frontend/app/(platform)/buyer/projects/create/page.tsx"]
+        FBidCompare["frontend/app/(platform)/buyer/bids/compare/[projectId]/page.tsx"]
+        FSellerProject["frontend/app/(platform)/seller/projects/[id]/page.tsx"]
+        FAdminUsers["frontend/app/(platform)/admin/users/page.tsx"]
+        FOrders["frontend/app/(platform)/orders/[id]/page.tsx"]
+        FReviews["frontend/app/(platform)/reviews/page.tsx"]
+        FSettings["frontend/app/(platform)/settings/page.tsx"]
+        FChat["frontend/components/chat/chat-window.tsx"]
+        FShell["frontend/components/layout/app-shell.tsx"]
+        FAuthHook["frontend/hooks/use-auth.ts"]
+    end
+
+    subgraph Store[State and API files]
+        SStore["frontend/features/store/use-bidwise-store.ts"]
+        SApi["frontend/features/services/api.ts"]
+    end
+
+    subgraph API[Backend endpoints]
+        EAuth["POST /api/auth/login\\nPOST /api/auth/register\\nPOST /api/auth/reset-password"]
+        EUsers["GET and PATCH /api/users"]
+        EBuyer["POST /api/buyer/projects\\nGET /api/buyer/projects/{id}/bids\\nPATCH accept, reject, complete"]
+        ESeller["GET /api/seller/projects\\nPOST and GET /api/seller/bids"]
+        EAdmin["GET /api/admin/projects\\nPATCH /api/admin/users/{id}/block\\nPATCH /api/admin/users/{id}/verify\\nGET and PATCH /api/admin/disputes"]
+        ECollab["POST and GET /api/messages\\nGET and PATCH /api/notifications"]
+        EReviews["POST and GET /api/reviews\\nPOST /api/disputes"]
+        EContracts["GET /api/contracts"]
+        EOrders["GET /api/orders\\nGET /api/orders/{id}\\nPUT /status\\nPATCH /delivery\\nPOST /complete"]
+        EPayments["POST /api/payments/create-intent"]
+    end
+
+    subgraph Controllers[Backend controller files]
+        CAuth["backend/src/main/java/com/bidwise/backend/controller/AuthController.java"]
+        CCommon["backend/src/main/java/com/bidwise/backend/controller/CommonController.java"]
+        CBuyer["backend/src/main/java/com/bidwise/backend/controller/buyer/BuyerController.java"]
+        CSeller["backend/src/main/java/com/bidwise/backend/controller/seller/SellerController.java"]
+        CAdmin["backend/src/main/java/com/bidwise/backend/controller/admin/AdminController.java"]
+        COrders["backend/src/main/java/com/bidwise/backend/controller/OrderController.java"]
+        CPayments["backend/src/main/java/com/bidwise/backend/controller/PaymentController.java"]
+    end
+
+    %% Frontend -> store/api file ownership
+    FLogin --> FAuthHook --> SStore
+    FRegister --> FAuthHook
+    FCreateProject --> SStore
+    FBidCompare --> SStore
+    FSellerProject --> SStore
+    FAdminUsers --> SStore
+    FOrders --> SStore
+    FSettings --> SStore
+    FChat --> SStore
+    FShell --> SStore
+    FReviews --> SStore
+    FReviews -. direct call .-> SApi
+
+    %% Store -> api client
+    SStore --> SApi
+
+    %% api.ts -> endpoint groups
+    SApi --> EAuth
+    SApi --> EUsers
+    SApi --> EBuyer
+    SApi --> ESeller
+    SApi --> EAdmin
+    SApi --> ECollab
+    SApi --> EReviews
+    SApi --> EContracts
+    SApi --> EOrders
+    SApi --> EPayments
+
+    %% endpoints -> controllers
+    EAuth --> CAuth
+    EUsers --> CCommon
+    ECollab --> CCommon
+    EReviews --> CCommon
+    EContracts --> CCommon
+    EBuyer --> CBuyer
+    ESeller --> CSeller
+    EAdmin --> CAdmin
+    EOrders --> COrders
+    EPayments --> CPayment

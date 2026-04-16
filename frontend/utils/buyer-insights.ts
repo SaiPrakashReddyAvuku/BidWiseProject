@@ -191,10 +191,10 @@ export const getCategoryDistribution = (projects: Project[]) => {
 
 export const getBudgetRangeDistribution = (projects: Project[]) => {
   const ranges = [
-    { label: "$0-$100", min: 0, max: 100, value: 0 },
-    { label: "$100-$500", min: 100, max: 500, value: 0 },
-    { label: "$500-$1000", min: 500, max: 1000, value: 0 },
-    { label: "$1000+", min: 1000, max: Number.POSITIVE_INFINITY, value: 0 }
+    { label: "₹0-₹10k", min: 0, max: 10000, value: 0 },
+    { label: "₹10k-₹50k", min: 10000, max: 50000, value: 0 },
+    { label: "₹50k-₹1L", min: 50000, max: 100000, value: 0 },
+    { label: "₹1L+", min: 100000, max: Number.POSITIVE_INFINITY, value: 0 }
   ];
 
   projects.forEach((project) => {
@@ -283,7 +283,7 @@ export const getRecommendedSellers = ({
       const reasons = [
         `${Math.round((seller.rating ?? 3) * 10) / 10}/5 rating`,
         `${completedProjects} completed projects`,
-        `Avg bid ${Math.round(avgBid)}`,
+        `Avg bid ₹${Math.round(avgBid)}`,
         `Location: ${location}`
       ];
 

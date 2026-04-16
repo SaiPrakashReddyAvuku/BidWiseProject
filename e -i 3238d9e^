@@ -1,0 +1,331 @@
+[33mcommit 3238d9e325efaff90f3b3dc41d372e7cd4d0fa0b[m
+Author: SaiPrakashReddyAvuku <prakashavuku@gmail.com>
+Date:   Sat Mar 14 16:36:33 2026 +0530
+
+    added basic order tracking,payment integration using stripe,
+
+[1mdiff --git a/backend/.env.example b/backend/.env.example[m
+[1mindex 74f5aa3..fa19ba4 100644[m
+[1m--- a/backend/.env.example[m
+[1m+++ b/backend/.env.example[m
+[36m@@ -12,8 +12,25 @@[m [mJPA_SHOW_SQL=false[m
+ JWT_SECRET=replace_with_base64_secret[m
+ JWT_EXPIRATION_MINUTES=120[m
+ [m
+[32m+[m[32m# Stripe settings[m
+[32m+[m[32mSTRIPE_API_KEY=replace_with_stripe_secret_key[m
+[32m+[m[32mSTRIPE_WEBHOOK_SECRET=replace_with_stripe_webhook_secret[m
+[32m+[m
+[32m+[m[32m# Mail settings[m
+[32m+[m[32mMAIL_HOST=smtp.example.com[m
+[32m+[m[32mMAIL_PORT=587[m
+[32m+[m[32mMAIL_USERNAME=replace_with_smtp_user[m
+[32m+[m[32mMAIL_PASSWORD=replace_with_smtp_password[m
+[32m+[m[32mMAIL_FROM=no-reply@bidwise.local[m
+[32m+[m[32mMAIL_SMTP_AUTH=true[m
+[32m+[m[32mMAIL_SMTP_STARTTLS=true[m
+[32m+[m[32mMAIL_SMTP_STARTTLS_REQUIRED=true[m
+[32m+[m
+ # Optional Docker MySQL container settings[m
+ MYSQL_DATABASE=bidwise[m
+ MYSQL_ROOT_PASSWORD=replace_with_real_password[m
+ MYSQL_USER=bidwise[m
+ MYSQL_PASSWORD=replace_with_real_password[m
+[32m+[m
+[32m+[m[32m# Seed data for local development[m
+[32m+[m[32mAPP_SEED_DATA=true[m
+[1mdiff --git a/backend/.factorypath b/backend/.factorypath[m
+[1mindex 051fe2e..e81d68c 100644[m
+[1m--- a/backend/.factorypath[m
+[1m+++ b/backend/.factorypath[m
+[36m@@ -42,7 +42,6 @@[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/hibernate/models/hibernate-models/1.0.1/hibernate-models-1.0.1.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/glassfish/jaxb/jaxb-runtime/4.0.6/jaxb-runtime-4.0.6.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/glassfish/jaxb/jaxb-core/4.0.6/jaxb-core-4.0.6.jar" enabled="true" runInBatchMode="false"/>[m
+[31m-    <factorypathentry kind="VARJAR" id="M2_REPO/org/eclipse/angus/angus-activation/2.0.3/angus-activation-2.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/glassfish/jaxb/txw2/4.0.6/txw2-4.0.6.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/com/sun/istack/istack-commons-runtime/4.1.2/istack-commons-runtime-4.1.2.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar" enabled="true" runInBatchMode="false"/>[m
+[36m@@ -63,6 +62,12 @@[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/jakarta/validation/jakarta.validation-api/3.1.1/jakarta.validation-api-3.1.1.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/jboss/logging/jboss-logging/3.6.2.Final/jboss-logging-3.6.2.Final.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/com/fasterxml/classmate/1.7.3/classmate-1.7.3.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/boot/spring-boot-starter-mail/4.0.3/spring-boot-starter-mail-4.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/boot/spring-boot-mail/4.0.3/spring-boot-mail-4.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/spring-context-support/7.0.5/spring-context-support-7.0.5.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/org/eclipse/angus/angus-mail/2.0.5/angus-mail-2.0.5.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/org/eclipse/angus/angus-activation/2.0.3/angus-activation-2.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/boot/spring-boot-starter-actuator/4.0.3/spring-boot-starter-actuator-4.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/boot/spring-boot-starter-micrometer-metrics/4.0.3/spring-boot-starter-micrometer-metrics-4.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/boot/spring-boot-micrometer-metrics/4.0.3/spring-boot-micrometer-metrics-4.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+[36m@@ -97,6 +102,9 @@[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/springframework/boot/spring-boot-web-server/4.0.3/spring-boot-web-server-4.0.3.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/webjars/swagger-ui/5.32.0/swagger-ui-5.32.0.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/org/webjars/webjars-locator-lite/1.1.3/webjars-locator-lite-1.1.3.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/com/stripe/stripe-java/24.8.0/stripe-java-24.8.0.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/com/google/code/gson/gson/2.13.2/gson-2.13.2.jar" enabled="true" runInBatchMode="false"/>[m
+[32m+[m[32m    <factorypathentry kind="VARJAR" id="M2_REPO/com/google/errorprone/error_prone_annotations/2.41.0/error_prone_annotations-2.41.0.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/io/jsonwebtoken/jjwt-api/0.13.0/jjwt-api-0.13.0.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/io/jsonwebtoken/jjwt-impl/0.13.0/jjwt-impl-0.13.0.jar" enabled="true" runInBatchMode="false"/>[m
+     <factorypathentry kind="VARJAR" id="M2_REPO/io/jsonwebtoken/jjwt-jackson/0.13.0/jjwt-jackson-0.13.0.jar" enabled="true" runInBatchMode="false"/>[m
+[1mdiff --git a/backend/pom.xml b/backend/pom.xml[m
+[1mindex 402bbb1..7fcc4a7 100644[m
+[1m--- a/backend/pom.xml[m
+[1m+++ b/backend/pom.xml[m
+[36m@@ -18,6 +18,7 @@[m
+     <properties>[m
+         <java.version>21</java.version>[m
+         <jjwt.version>0.13.0</jjwt.version>[m
+[32m+[m[32m        <stripe.version>24.8.0</stripe.version>[m
+     </properties>[m
+ [m
+     <dependencies>[m
+[36m@@ -33,6 +34,10 @@[m
+             <groupId>org.springframework.boot</groupId>[m
+             <artifactId>spring-boot-starter-validation</artifactId>[m
+         </dependency>[m
+[32m+[m[32m        <dependency>[m
+[32m+[m[32m            <groupId>org.springframework.boot</groupId>[m
+[32m+[m[32m            <artifactId>spring-boot-starter-mail</artifactId>[m
+[32m+[m[32m        </dependency>[m
+         <dependency>[m
+             <groupId>org.springframework.boot</groupId>[m
+             <artifactId>spring-boot-starter-actuator</artifactId>[m
+[36m@@ -46,6 +51,15 @@[m
+             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>[m
+             <version>3.0.2</version>[m
+         </dependency>[m
+[32m+[m[32m        <dependency>[m
+[32m+[m[32m            <groupId>com.stripe</groupId>[m
+[32m+[m[32m            <artifactId>stripe-java</artifactId>[m
+[32m+[m[32m            <version>${stripe.version}</version>[m
+[32m+[m[32m        </dependency>[m
+[32m+[m[32m        <dependency>[m
+[32m+[m[32m            <groupId>com.google.code.gson</groupId>[m
+[32m+[m[32m            <artifactId>gson</artifactId>[m
+[32m+[m[32m        </dependency>[m
+ [m
+         <dependency>[m
+             <groupId>io.jsonwebtoken</groupId>[m
+[1mdiff --git a/backend/src/main/java/com/bidwise/backend/config/DataSeeder.java b/backend/src/main/java/com/bidwise/backend/config/DataSeeder.java[m
+[1mnew file mode 100644[m
+[1mindex 0000000..7a22497[m
+[1m--- /dev/null[m
+[1m+++ b/backend/src/main/java/com/bidwise/backend/config/DataSeeder.java[m
+[36m@@ -0,0 +1,93 @@[m
+[32m+[m[32mpackage com.bidwise.backend.config;[m
+[32m+[m
+[32m+[m[32mimport com.bidwise.backend.entity.Bid;[m
+[32m+[m[32mimport com.bidwise.backend.entity.Project;[m
+[32m+[m[32mimport com.bidwise.backend.entity.UserEntity;[m
+[32m+[m[32mimport com.bidwise.backend.entity.enums.BidStatus;[m
+[32m+[m[32mimport com.bidwise.backend.entity.enums.ProjectStatus;[m
+[32m+[m[32mimport com.bidwise.backend.entity.enums.UserRole;[m
+[32m+[m[32mimport com.bidwise.backend.repository.BidRepository;[m
+[32m+[m[32mimport com.bidwise.backend.repository.ProjectRepository;[m
+[32m+[m[32mimport com.bidwise.backend.repository.UserRepository;[m
+[32m+[m[32mimport lombok.RequiredArgsConstructor;[m
+[32m+[m[32mimport org.springframework.boot.CommandLineRunner;[m
+[32m+[m[32mimport org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;[m
+[32m+[m[32mimport org.springframework.security.crypto.password.PasswordEncoder;[m
+[32m+[m[32mimport org.springframework.stereotype.Component;[m
+[32m+[m
+[32m+[m[32mimport java.time.LocalDate;[m
+[32m+[m[32mimport java.util.List;[m
+[32m+[m
+[32m+[m[32m@Component[m
+[32m+[m[32m@RequiredArgsConstructor[m
+[32m+[m[32m@ConditionalOnProperty(name = "app.seed-data", havingValue = "true")[m
+[32m+[m[32mpublic class DataSeeder implements CommandLineRunner {[m
+[32m+[m
+[32m+[m[32m    private final UserRepository userRepository;[m
+[32m+[m[32m    private final ProjectRepository projectRepository;[m
+[32m+[m[32m    private final BidRepository bidRepository;[m
+[32m+[m[32m    private final PasswordEncoder passwordEncoder;[m
+[32m+[m
+[32m+[m[32m    @Override[m
+[32m+[m[32m    public void run(String... args) {[m
+[32m+[m[32m        if (userRepository.count() > 0) {[m
+[32m+[m[32m            return;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        UserEntity buyer = userRepository.save(UserEntity.builder()[m
+[32m+[m[32m                .name("Olivia Carter")[m
+[32m+[m[32m                .email("buyer@bidwise.com")[m
+[32m+[m[32m                .passwordHash(passwordEncoder.encode("Password@123"))[m
+[32m+[m[32m                .role(UserRole.BUYER)[m
+[32m+[m[32m                .phone("555-0101")[m
+[32m+[m[32m                .companyName("BlueWave Commerce")[m
+[32m+[m[32m                .blocked(false)[m
+[32m+[m[32m                .verified(true)[m
+[32m+[m[32m                .rating(4.6)[m
+[32m+[m[32m                .skills(List.of("e-commerce", "growth"))[m
+[32m+[m[32m                .build());[m
+[32m+[m
+[32m+[m[32m        UserEntity seller = userRepository.save(UserEntity.builder()[m
+[32m+[m[32m                .name("Vendor A")[m
+[32m+[m[32m                .email("seller@bidwise.com")[m
+[32m+[m[32m                .passwordHash(passwordEncoder.encode("Password@123"))[m
+[32m+[m[32m                .role(UserRole.SELLER)[m
+[32m+[m[32m                .phone("555-0102")[m
+[32m+[m[32m                .companyName("BrightStack Labs")[m
+[32m+[m[32m                .blocked(false)[m
+[32m+[m[32m                .verified(true)[m
+[32m+[m[32m                .rating(4.7)[m
+[32m+[m[32m                .skills(List.of("react", "stripe", "ux"))[m
+[32m+[m[32m                .build());[m
+[32m+[m
+[32m+[m[32m        userRepository.save(UserEntity.builder()[m
+[32m+[m[32m                .name("BidWise Admin")[m
+[32m+[m[32m                .email("admin@bidwise.com")[m
+[32m+[m[32m                .passwordHash(passwordEncoder.encode("Password@123"))[m
+[32m+[m[32m                .role(UserRole.ADMIN)[m
+[32m+[m[32m                .blocked(false)[m
+[32m+[m[32m                .verified(true)[m
+[32m+[m[32m                .build());[m
+[32m+[m
+[32m+[m[32m        Project project = projectRepository.save(Project.builder()[m
+[32m+[m[32m                .buyerId(buyer.getId())[m
+[32m+[m[32m                .title("E-commerce Checkout Optimization")[m
+[32m+[m[32m                .description("Improve checkout flow and reduce cart abandonment.")[m
+[32m+[m[32m                .budget(12000.0)[m
+[32m+[m[32m                .category("Web Development")[m
+[32m+[m[32m                .deadline(LocalDate.now().plusDays(30))[m
+[32m+[m[32m                .location("Remote")[m
+[32m+[m[32m                .attachments(List.of("checkout-spec.pdf", "analytics.csv"))[m
+[32m+[m[32m                .status(ProjectStatus.OPEN)[m
+[32m+[m[32m                .build());[m
+[32m+[m
+[32m+[m[32m        bidRepository.save(Bid.builder()[m
+[32m+[m[32m                .projectId(project.getId())[m
+[32m+[m[32m                .sellerId(seller.getId())[m
+[32m+[m[32m                .price(8500.0)[m
+[32m+[m[32m                .deliveryDays(19)[m
+[32m+[m[32m                .proposal("We will streamline checkout steps and optimize payment flow.")[m
+[32m+[m[32m                .status(BidStatus.PENDING)[m
+[32m+[m[32m                .build());[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[1mdiff --git a/backend/src/main/java/com/bidwise/backend/config/SecurityConfig.java b/backend/src/main/java/com/bidwise/backend/config/SecurityConfig.java[m
+[1mindex f18318d..4d43224 100644[m
+[1m--- a/backend/src/main/java/com/bidwise/backend/config/SecurityConfig.java[m
+[1m+++ b/backend/src/main/java/com/bidwise/backend/config/SecurityConfig.java[m
+[36m@@ -40,6 +40,7 @@[m [mpublic class SecurityConfig {[m
+                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()[m
+                         .requestMatchers([m
+                                 "/api/auth/**",[m
+[32m+[m[32m                                "/api/payments/webhook",[m
+                                 "/api/health/**",[m
+                                 "/swagger-ui/**",[m
+                                 "/api-docs/**",[m
+[1mdiff --git a/backend/src/main/java/com/bidwise/backend/controller/AuthController.java b/backend/src/main/java/com/bidwise/backend/controller/AuthController.java[m
+[1mindex 7684b6f..9bb796a 100644[m
+[1m--- a/backend/src/main/java/com/bidwise/backend/controller/AuthController.java[m
+[1m+++ b/backend/src/main/java/com/bidwise/backend/controller/AuthController.java[m
+[36m@@ -3,11 +3,14 @@[m [mpackage com.bidwise.backend.controller;[m
+ import com.bidwise.backend.dto.auth.AuthLoginRequest;[m
+ import com.bidwise.backend.dto.auth.AuthRegisterRequest;[m
+ import com.bidwise.backend.dto.auth.AuthResponse;[m
+[32m+[m[32mimport com.bidwise.backend.dto.auth.AuthResetPasswordRequest;[m
+ import com.bidwise.backend.service.auth.AuthService;[m
+ import jakarta.validation.Valid;[m
+ import lombok.RequiredArgsConstructor;[m
+ import org.springframework.web.bind.annotation.*;[m
+ [m
+[32m+[m[32mimport java.util.Map;[m
+[32m+[m
+ @RestController[m
+ @RequiredArgsConstructor[m
+ @RequestMapping("/api/auth")[m
+[36m@@ -24,5 +27,11 @@[m [mpublic class AuthController {[m
+     public AuthResponse login(@Valid @RequestBody AuthLoginRequest request) {[m
+         return authService.login(request);[m
+     }[m
+[32m+[m
+[32m+[m[32m    @PostMapping("/reset-password")[m
+[32m+[m[32m    public Map<String, String> resetPassword(@Valid @RequestBody AuthResetPasswordRequest request) {[m
+[32m+[m[32m        authService.resetPassword(request);[m
+[32m+[m[32m        return Map.of("message", "Password reset successful. You can now log in with the new password.");[m
+[32m+[m[32m    }[m
+ }[m
+ [m
+[1mdiff --git a/backend/src/main/java/com/bidwise/backend/controller/OrderController.java b/backend/src/main/java/com/bidwise/backend/controller/OrderController.java[m
+[1mnew file mode 100644[m
+[1mindex 0000000..17a997a[m
+[1m--- /dev/null[m
+[1m+++ b/backend/src/main/java/com/bidwise/backend/controller/OrderController.java[m
+[36m@@ -0,0 +1,52 @@[m
+[32m+[m[32mpackage com.bidwise.backend.controller;[m
+[32m+[m
+[32m+[m[32mimport com.bidwise.backend.dto.order.OrderDeliveryUpdateRequest;[m
+[32m+[m[32mimport com.bidwise.backend.dto.order.OrderResponse;[m
+[32m+[m[32mimport com.bidwise.backend.dto.order.OrderStatusUpdateRequest;[m
+[32m+[m[32mimport com.bidwise.backend.service.OrderService;[m
+[32m+[m[32mimport jakarta.validation.Valid;[m
+[32m+[m[32mimport lombok.RequiredArgsConstructor;[m
+[32m+[m[32mimport org.springframework.security.core.Authentication;[m
+[32m+[m[32mimport org.springframework.web.bind.annotation.*;[m
+[32m+[m
+[32m+[m[32mimport java.util.UUID;[m
+[32m+[m[32mimport com.bidwise.backend.dto.common.PageResponse;[m
+[32m+[m
+[32m+[m[32m@RestController[m
+[32m+[m[32m@RequiredArgsConstructor[m
+[32m+[m[32m@RequestMapping("/api/orders")[m
+[32m+[m[32mpublic class OrderController {[m
+[32m+[m
+[32m+[m[32m    private final OrderService orderService;[m
+[32m+[m
+[32m+[m[32m    @GetMapping[m
+[32m+[m[32m    public PageResponse<OrderResponse> list(@RequestParam(defaultValue = "0") int page,[m
+[32m+[m[32m                                            @RequestParam(defaultValue = "20") int size,[m
+[32m+[m[32m                                            Authentication authentication) {[m
+[32m+[m[32m        return orderService.getOrdersForUser(authentication.getName(), page, size);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    @GetMapping("/{orderId}")[m
+[32m+[m[32m    public OrderResponse getOrder(@PathVariable UUID orderId, Authentication authentication) {[m
+[32m+[m[32m        return orderService.getOrder(orderId, authentication.getName());[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    @PatchMapping("/{orderId}/delivery")[m
+[32m+[m[32m    public OrderResponse updateDelivery(@PathVariable UUID orderId,[m
+[32m+[m[32m                                        @Valid @RequestBody OrderDeliveryUpdateRequest request,[m
+[32m+[m[32m                                        Authentication authentication) {[m
+[32m+[m[32m        return orderService.updateDeliveryDetails(orderId, request, authentication.getName());[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    @PutMapping("/{orderId}/status")[m
+[32m+[m[32m    public OrderResponse updateStatus(@PathVariable UUID orderId,[m
+[32m+[m[32m                                      @Valid @RequestBody OrderStatusUpdateRequest request,[m
+[32m+[m[32m                                      Authentication authentication) {[m
+[32m+[m[32m        return orderService.updateStatus(orderId, request, authentication.getName());[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    @PostMapping("/{orderId}/complete")[m
+[32m+[m[32m    public OrderResponse complete(@PathVariable UUID orderId, Authentication authentication) {[m
+[32m+[m[32m        return orderService.completeOrder(orderId, authentication.getName());[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[1mdiff --git a/backend/src/main/java/com/bidwise/backend/controller/PaymentController.java b/backend/src/main/java/com/bidwise/backend/controller/PaymentController.java[m
+[1mnew file mode 100644[m
+[1mindex 0000000..5bf3e4e[m
+[1m--- /dev/null[m
+[1m+++ b/backend/src/main/java/com/bidwise/backend/controller/PaymentController.java[m
+[36m@@ -0,0 +1,31 @@[m
+[32m+[m[32mpackage com.bidwise.backend.controller;[m
+[32m+[m
+[32m+[m[32mimport com.bidwise.backend.dto.payment.PaymentIntentRequest;[m
+[32m+[m[32mimport com.bidwise.backend.dto.payment.PaymentIntentResponse;[m
+[32m+[m[32mimport com.bidwise.backend.service.PaymentService;[m
+[32m+[m[32mimport jakarta.validation.Valid;[m
+[32m+[m[32mimport lombok.RequiredArgsConstructor;[m
+[32m+[m[32mimport org.springframework.http.ResponseEntity;[m
+[32m+[m[32mimport org.springframework.security.core.Authentication;[m
+[32m+[m[32mimport org.springframework.web.bind.annotation.*;[m
+[32m+[m
+[32m+[m[32m@RestController[m
+[32m+[m[32m@RequiredArgsConstructor[m
+[32m+[m[32m@RequestMapping("/api/payments")[m
+[32m+[m[32mpublic class PaymentControl

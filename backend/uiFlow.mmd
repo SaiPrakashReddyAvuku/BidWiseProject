@@ -1,0 +1,36 @@
+flowchart TD
+    A[User Opens BidWise] --> B{Authenticated?}
+    B -- No --> C[Register / Login]
+    C --> D[JWT Issued + Role]
+    B -- Yes --> D
+
+    D --> E{Role}
+
+    %% Buyer flow
+    E -- Buyer --> F[Create Project]
+    F --> G[Project Published]
+    G --> H[View Incoming Bids]
+    H --> I[Compare Bids]
+    I --> J{Accept Bid?}
+    J -- Yes --> K[Create Order / Contract]
+    J -- No --> L[Reject Bid or Keep Open]
+
+    %% Seller flow
+    E -- Seller --> M[Browse Open Projects]
+    M --> N[Submit Bid]
+    N --> O[Bid Stored]
+    O --> P[Notify Buyer]
+    P --> H
+
+    %% Shared post-acceptance flow
+    K --> Q[Messaging]
+    K --> R[Notifications]
+    K --> S[Delivery / Completion]
+    S --> T[Review / Rating]
+
+    %% Admin flow
+    E -- Admin --> U[Admin Dashboard]
+    U --> V[User Moderation]
+    U --> W[Dispute Resolution]
+    W --> X[Resolution Applied]
+    X --> R
